@@ -128,9 +128,13 @@ const fetchServiceMap = async (inputDirectory, outputDirectory) => {
     throw new Error(`Missing directory: ${inputDirectory}`);
   }
 
-  if (!fs.existsSync(`${inputDirectory}/services.json`)) {
+  const inDir = fs.realpathSync(inputDirectory);
+
+  if (!fs.existsSync(`${inDir}/services.json`)) {
     throw new Error(`Missing file: ${inputDirectory}/services.json`);
   }
+
+  console.log(`Using services.json: ${inputDirectory}/services.json`);
 
   const services = JSON.parse(fs.readFileSync(fs.openSync(`${inputDirectory}/services.json`)));
 
