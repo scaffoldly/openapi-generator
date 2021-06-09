@@ -12,4 +12,3 @@ jobs:
           action: postrelease
           version-file: package.json
           repo-token: ${{ secrets.GITHUB_TOKEN }}
-          major-tag: true
