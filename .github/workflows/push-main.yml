@@ -1,0 +1,19 @@
+name: Push to Main
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+jobs:
+  bump-version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v2-beta
+        with:
+          node-version: '12'
+      - run: yarn
+      - uses: scaffoldly/bump-version-action@v1
+        with:
+          action: prerelease
+          version-file: package.json
+          repo-token: ${{ secrets.GITHUB_TOKEN }}

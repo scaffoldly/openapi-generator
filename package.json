@@ -3,18 +3,24 @@
   "version": "1.0.0",
   "description": "Wrapper for OpenAPITools/openapi-generator-cli",
   "main": "index.js",
+  "bin": {
+    "openapi-generator": "./dist/index.js"
+  },
   "repository": "git@github.com:scaffoldly/openapi-generator",
   "author": "Christian Nuss",
   "license": "GPL-3.0-or-later",
   "scripts": {
     "build": "ncc build index.js --license licenses.txt",
-    "prepare": "yarn build",
+    "prepare": "yarn build && chmod +x dist/index.js",
     "version": "git add -A dist",
     "postversion": "git push origin HEAD:main && git push --follow-tags"
   },
   "dependencies": {
+    "@openapitools/openapi-generator-cli": "^2.3.3",
     "axios": "^0.21.1",
-    "simple-git": "^2.39.0"
+    "simple-git": "^2.39.0",
+    "uri-js": "^4.4.1",
+    "yargs": "^17.0.1"
   },
   "devDependencies": {
     "@vercel/ncc": "^0.27.0"

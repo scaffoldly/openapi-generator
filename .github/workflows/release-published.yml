@@ -1,0 +1,15 @@
+name: Release Published
+on:
+  release:
+    types: [published]
+jobs:
+  postrelease:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: scaffoldly/bump-version-action@v1
+        with:
+          action: postrelease
+          version-file: package.json
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          major-tag: true
