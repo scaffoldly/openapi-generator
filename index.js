@@ -38,12 +38,12 @@ const repoInfo = async () => {
     throw new Error(`Unable to extract path from ${origin.refs.push}`);
   }
 
-  const organization = path.split('/')[0];
+  const organization = path.split('/')[path.startsWith('/') ? 1 : 0];
   if (!organization) {
     throw new Error(`Unable to extract organization from ${path}`);
   }
 
-  let repo = path.split('/')[1];
+  let repo = path.split('/')[path.startsWith('/') ? 2 : 1];
   if (!repo) {
     throw new Error(`Unable to extract repo from ${path}`);
   }
