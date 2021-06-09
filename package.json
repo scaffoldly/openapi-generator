@@ -16,7 +16,6 @@
     "postversion": "git push origin HEAD:main && git push --follow-tags"
   },
   "dependencies": {
-    "@openapitools/openapi-generator-cli": "^2.3.3",
     "axios": "^0.21.1",
     "simple-git": "^2.39.0",
     "uri-js": "^4.4.1",
