@@ -167,7 +167,7 @@ const generateApi = async (
 
   fs.mkdirSync(outputDirectory, { recursive: true });
 
-  let commands = [`npx openapi-generator-cli`];
+  let commands = [`npx @openapitools/openapi-generator-cli`];
   commands.push('generate');
   commands.push(`-g ${generator}`);
   commands.push(`-i ${openapiUrl}`);
