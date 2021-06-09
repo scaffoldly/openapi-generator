@@ -123,7 +123,7 @@ const event = (org, repo, action, dnt = false) => {
     });
 };
 
-const fetchServiceMap = async (outputDirectory, inputDirectory = '.scaffoldly') => {
+const fetchServiceMap = async (inputDirectory, outputDirectory) => {
   if (!fs.existsSync(inputDirectory)) {
     throw new Error(`Missing directory: ${inputDirectory}`);
   }
@@ -188,7 +188,7 @@ const generateApi = async (
   return outputDirectory;
 };
 
-const run = async (generator, outputDirectory) => {
+const run = async (generator, inputDirectory, outputDirectory) => {
   const { organization, repo } = await repoInfo();
   event(organization, repo, generator);
 
@@ -196,7 +196,7 @@ const run = async (generator, outputDirectory) => {
     throw new Error(`Unknown generator: ${generator}`);
   }
 
-  const serviceMap = await fetchServiceMap(outputDirectory);
+  const serviceMap = await fetchServiceMap(inputDirectory, outputDirectory);
 
   const promises = Object.values(serviceMap).map(async (properties) => {
     const result = await generateApi(generator, properties);
@@ -211,6 +211,8 @@ const run = async (generator, outputDirectory) => {
     const argv = require('yargs/yargs')(process.argv.slice(2))
       .usage('Usage: $0 [options]')
       .describe('g', `Generator, one of: [${Object.keys(frameworks)}]`)
+      .describe('i', `Input directory`)
+      .default('i', '.scaffoldly')
       .describe('o', `Output directory`)
       .example(
         '$0 -g angular -o src/app/@openapi',
@@ -218,7 +220,7 @@ const run = async (generator, outputDirectory) => {
       )
       .demandOption(['g', 'o']).argv;
 
-    await run(argv.g, argv.o);
+    await run(argv.g, argv.i, argv.o);
   } catch (e) {
     console.error(e);
   }
