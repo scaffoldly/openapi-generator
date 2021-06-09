@@ -6,9 +6,6 @@
   "bin": {
     "openapi-generator": "./dist/index.js"
   },
-  "files": [
-    "dist"
-  ],
   "repository": "git@github.com:scaffoldly/openapi-generator",
   "author": "Christian Nuss",
   "license": "GPL-3.0-or-later",
