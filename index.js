@@ -6,6 +6,8 @@ const uri = require('uri-js');
 const fs = require('fs');
 const proc = require('child_process');
 
+const { DNT } = process.env;
+
 const frameworks = {
   angular: {
     generator: 'typescript-angular',
@@ -102,7 +104,7 @@ const exec = (command) => {
 };
 
 const event = (org, repo, action, dnt = false) => {
-  if (dnt) {
+  if (DNT) {
     return;
   }
 

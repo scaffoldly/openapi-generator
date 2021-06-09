@@ -28,7 +28,7 @@ In `package.json`:
 ## Usage
 
 ```
-Usage: index.js [options]
+Usage: openapi-generator [options]
 
 Options:
       --help     Show help                                             [boolean]
@@ -38,6 +38,15 @@ Options:
   -o             Output directory                                     [required]
 
 Examples:
-  index.js -g angular -o src/app/@openapi  Generate Angular client libraries
-                                           into src/app/@openapi/{service-name}
+  openapi-generator -g angular -o           Generate Angular client libraries
+  src/app/@openapi                          into src/app/@openapi/{service-name}
+```
+
+### Usage Tracking Opt-Out
+
+If you want to opt out of usage metrics, set the `DNT` environment variable prior
+to running the script, e.g.:
+
+```
+DNT=1 npx @scaffoldly/openapi-generator
 ```
