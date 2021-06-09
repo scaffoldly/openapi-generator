@@ -122,12 +122,12 @@ const event = (org, repo, action, dnt = false) => {
   params.set('ea', `generate-${action}`);
   params.set('el', `${org}/${repo}`);
 
-  // axios.default
-  //   .post(`https://www.google-analytics.com/collect?${params.toString()}`)
-  //   .then(() => {})
-  //   .catch((error) => {
-  //     console.error("Event Log Error", error);
-  //   });
+  axios.default
+    .post(`https://www.google-analytics.com/collect?${params.toString()}`)
+    .then(() => {})
+    .catch((error) => {
+      console.error('Event Log Error', error);
+    });
 };
 
 const fetchServiceMap = async (outputDirectory, inputDirectory = '.scaffoldly') => {
