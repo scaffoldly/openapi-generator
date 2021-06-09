@@ -89,8 +89,8 @@ const exec = (command) => {
       reject(new Error(`Command '${command}' exited with code ${code}`));
     });
 
-    // p.stdout.pipe(process.stdout);
-    // p.stderr.pipe(process.stdout); // Pipe stderr to stdout too
+    p.stdout.pipe(process.stdout);
+    p.stderr.pipe(process.stdout); // Pipe stderr to stdout too
 
     p.stdout.on('data', (chunk) => {
       stdout = `${stdout}${chunk}`;
