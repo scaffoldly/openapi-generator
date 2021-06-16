@@ -1,10 +1,12 @@
 #!/usr/bin/env node
 
-const simpleGit = require('simple-git');
-const axios = require('axios');
-const uri = require('uri-js');
-const fs = require('fs');
-const proc = require('child_process');
+import simpleGit from 'simple-git';
+import axios from 'axios';
+import { parse } from 'uri-js';
+import { existsSync, realpathSync, readFileSync, openSync, mkdirSync } from 'fs';
+import { spawn } from 'child_process';
+import PQueue from 'p-queue';
+import yargs from 'yargs';
 
 const { DNT } = process.env;
 
@@ -12,6 +14,10 @@ const frameworks = {
   angular: {
     generator: 'typescript-angular',
     properties: ['-p apiModulePrefix={serviceNamePascalCase}'],
+  },
+  axios: {
+    generator: 'typescript-axios',
+    properties: ['-p modelNamePrefix={serviceNamePascalCase}'],
   },
 };
 
@@ -24,16 +30,16 @@ const pascalCase = (str) => {
 };
 
 const repoInfo = async () => {
-  const log = await simpleGit.default().log({ maxCount: 1 });
+  const log = await simpleGit().log({ maxCount: 1 });
   const sha = log.latest.hash;
 
-  const remotes = await simpleGit.default().getRemotes(true);
+  const remotes = await simpleGit().getRemotes(true);
   const origin = remotes.find((remote) => remote.name === 'origin');
   if (!origin) {
     throw new Error("Unable to find remote with name 'origin'");
   }
 
-  const { path } = uri.parse(origin.refs.push);
+  const { path } = parse(origin.refs.push);
   if (!path) {
     throw new Error(`Unable to extract path from ${origin.refs.push}`);
   }
@@ -69,7 +75,7 @@ const exec = (command) => {
     console.log(`Running Command: ${command}`);
 
     const parts = command.split(' ');
-    const p = proc.spawn(parts[0], parts.slice(1), {
+    const p = spawn(parts[0], parts.slice(1), {
       shell: true,
       env: {
         ...process.env,
@@ -117,7 +123,7 @@ const event = (org, repo, action, dnt = false) => {
   params.set('ea', `generate-${action}`);
   params.set('el', `${org}/${repo}`);
 
-  axios.default
+  axios
     .post(`https://www.google-analytics.com/collect?${params.toString()}`)
     .then(() => {})
     .catch((error) => {
@@ -126,22 +132,35 @@ const event = (org, repo, action, dnt = false) => {
 };
 
 const fetchServiceMap = async (inputDirectory, outputDirectory) => {
-  if (!fs.existsSync(inputDirectory)) {
+  if (!existsSync(inputDirectory)) {
     throw new Error(`Missing directory: ${inputDirectory}`);
   }
 
-  const inDir = fs.realpathSync(inputDirectory);
+  const inDir = realpathSync(inputDirectory);
 
-  if (!fs.existsSync(`${inDir}/services.json`)) {
-    throw new Error(`Missing file: ${inDir}/services.json`);
+  const servicesFile = `${inDir}/services.json`;
+  const envVarsFile = `${inDir}/env-vars.json`;
+
+  if (!existsSync(servicesFile)) {
+    throw new Error(`Missing file: ${servicesFile}`);
   }
 
-  console.log(`Using services.json: ${inDir}/services.json`);
+  if (!existsSync(envVarsFile)) {
+    throw new Error(`Missing file: ${envVarsFile}`);
+  }
 
-  const services = JSON.parse(fs.readFileSync(fs.openSync(`${inDir}/services.json`)));
+  console.log(`Using services.json: ${servicesFile}`);
+  console.log(`Using env-vars.json: ${envVarsFile}`);
+
+  const services = JSON.parse(readFileSync(openSync(servicesFile)));
+  const envVars = JSON.parse(readFileSync(openSync(envVarsFile)));
 
   const serviceMap = Object.entries(services).reduce((acc, [key, value]) => {
     const { base_url: baseUrl, service_name: serviceName } = value;
+    if (envVars.SERVICE_NAME === serviceName) {
+      console.log(`Skipping ${serviceName}, that's this project!`);
+      return acc;
+    }
     const openapiUrl = `${baseUrl}/openapi.json`;
     const serviceNamePascalCase = pascalCase(serviceName);
     const outDir = `${outputDirectory}/${serviceName}`;
@@ -165,13 +184,13 @@ const generateApi = async (
   const { generator, properties } = frameworks[generatorAlias];
 
   try {
-    await axios.default.get(openapiUrl);
+    await axios.get(openapiUrl);
   } catch (e) {
     console.log(`Skipping ${serviceNamePascalCase} using ${openapiUrl}: ${e.message}`);
     return null;
   }
 
-  fs.mkdirSync(outputDirectory, { recursive: true });
+  mkdirSync(outputDirectory, { recursive: true });
 
   let commands = [`npx @openapitools/openapi-generator-cli`];
   commands.push('generate');
@@ -204,17 +223,17 @@ const run = async (generator, inputDirectory, outputDirectory) => {
 
   const serviceMap = await fetchServiceMap(inputDirectory, outputDirectory);
 
-  const promises = Object.values(serviceMap).map(async (properties) => {
-    const result = await generateApi(generator, properties);
-    return result;
+  const promises = Object.values(serviceMap).map((properties) => {
+    return async () => await generateApi(generator, properties);
   });
 
-  const results = await Promise.all(promises);
+  const queue = new PQueue({ concurrency: 1 });
+  await queue.addAll(promises);
 };
 
 (async () => {
   try {
-    const argv = require('yargs/yargs')(process.argv.slice(2))
+    const argv = yargs(process.argv.slice(2))
       .usage('Usage: $0 [options]')
       .describe('g', `Generator, one of: [${Object.keys(frameworks)}]`)
       .describe('i', `Input directory`)

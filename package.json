@@ -3,6 +3,7 @@
   "version": "1.0.9",
   "description": "Wrapper for OpenAPITools/openapi-generator-cli",
   "main": "index.js",
+  "type" : "module",
   "bin": {
     "openapi-generator": "./index.js"
   },
@@ -14,6 +15,7 @@
   "license": "GPL-3.0-or-later",
   "dependencies": {
     "axios": "^0.21.1",
+    "p-queue": "^7.1.0",
     "simple-git": "^2.39.0",
     "uri-js": "^4.4.1",
     "yargs": "^17.0.1"
