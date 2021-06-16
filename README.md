@@ -2,7 +2,7 @@
 
 This CLI is a wrapper for the [OpenAPI Generator CLI](https://github.com/OpenAPITools/openapi-generator-cli).
 
-It will read `service.json` within the provided input directory (default `.scaffoldly`),
+It will read `services.json` within the provided input directory (default `.scaffoldly`),
 and generate client libraries.
 
 ## Running
