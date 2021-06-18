@@ -173,7 +173,9 @@ const fetchServiceMap = async (inputDirectory, outputDirectory, required = []) =
       serviceName,
       serviceNamePascalCase,
       outputDirectory: outDir,
-      required: required.find((r) => r.toLowerCase() === serviceName) ? true : false,
+      required: required.find((r) => r === '+all' || r.toLowerCase() === serviceName)
+        ? true
+        : false,
     };
     return acc;
   }, {});
@@ -279,11 +281,22 @@ const run = async (generator, inputDirectory, outputDirectory, required) => {
       .describe('i', `Input directory`)
       .default('i', '.scaffoldly')
       .describe('o', `Output directory`)
-      .describe('r', 'Require a response from these services(s)')
+      .describe(
+        'r',
+        "Require a response from these services(s), use '+all' to require all services",
+      )
       .array('r')
       .example(
-        '$0 -g angular -o src/app/@openapi',
-        'Generate Angular client libraries into src/app/@openapi/{service-name}',
+        '$0 -g angular -o src/app/openapi -r +all',
+        'Generate Angular client libraries into src/app/openapi/{service-name}. Retries until all services are loaded',
+      )
+      .example(
+        '$0 -g axios -o src/app/openapi -r auth -r foo',
+        'Generate Axios client libraries into src/app/openapi/{service-name}. Retries until auth and foo are loaded',
+      )
+      .example(
+        '$0 -g angular -o src/app/openapi',
+        'Generate Angular client libraries into src/app/openapi/{service-name}. No retries',
       )
       .demandOption(['g', 'o']).argv;
 

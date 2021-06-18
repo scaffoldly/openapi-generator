@@ -21,7 +21,7 @@ In `package.json`:
 
 ```
   "scripts": {
-    "openapi": "yarn openapi-generator -g angular -i .scaffoldly/$NODE_ENV -o src/app/@openapi"
+    "openapi": "yarn openapi-generator -g angular -i .scaffoldly/$NODE_ENV -o src/app/@openapi -r +all"
   },
 ```
 
@@ -33,13 +33,22 @@ Usage: openapi-generator [options]
 Options:
       --help     Show help                                             [boolean]
       --version  Show version number                                   [boolean]
-  -g             Generator, one of: [angular]                         [required]
+  -g             Generator, one of: [angular,axios]                   [required]
   -i             Input directory                        [default: ".scaffoldly"]
   -o             Output directory                                     [required]
+  -r             Require a response from these services(s), use '+all' to requir
+                 e all services                                          [array]
 
 Examples:
-  openapi-generator -g angular -o           Generate Angular client libraries
-  src/app/@openapi                          into src/app/@openapi/{service-name}
+  index.js -g angular -o src/app/openapi -  Generate Angular client libraries in
+  r +all                                    to src/app/openapi/{service-name}. R
+                                            etries until all services are loaded
+  index.js -g axios -o src/app/openapi -r   Generate Axios client libraries into
+  auth -r foo                                src/app/openapi/{service-name}. Ret
+                                            ries until auth and foo are loaded
+  index.js -g angular -o src/app/openapi    Generate Angular client libraries in
+                                            to src/app/openapi/{service-name}. N
+                                            o retries
 ```
 
 ### Usage Tracking Opt-Out
