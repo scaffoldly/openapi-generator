@@ -8,6 +8,9 @@ import { spawn } from 'child_process';
 import PQueue from 'p-queue';
 import yargs from 'yargs';
 
+const MAX_RETRIES = 120;
+const WAIT_FOR = 5000; // milliseconds
+
 const { DNT } = process.env;
 
 const frameworks = {
@@ -131,7 +134,7 @@ const event = (org, repo, action, dnt = false) => {
     });
 };
 
-const fetchServiceMap = async (inputDirectory, outputDirectory) => {
+const fetchServiceMap = async (inputDirectory, outputDirectory, required = []) => {
   if (!existsSync(inputDirectory)) {
     throw new Error(`Missing directory: ${inputDirectory}`);
   }
@@ -164,12 +167,13 @@ const fetchServiceMap = async (inputDirectory, outputDirectory) => {
     const openapiUrl = `${baseUrl}/openapi.json`;
     const serviceNamePascalCase = pascalCase(serviceName);
     const outDir = `${outputDirectory}/${serviceName}`;
-    console.log(`Discovered ${serviceNamePascalCase} service (${openapiUrl})`);
+    console.log(`Discovered ${serviceName} service (${openapiUrl})`);
     acc[key] = {
       openapiUrl,
       serviceName,
       serviceNamePascalCase,
       outputDirectory: outDir,
+      required: required.find((r) => r.toLowerCase() === serviceName) ? true : false,
     };
     return acc;
   }, {});
@@ -177,16 +181,52 @@ const fetchServiceMap = async (inputDirectory, outputDirectory) => {
   return serviceMap;
 };
 
+const openUrl = (url, required = false, ttl = MAX_RETRIES) => {
+  return new Promise((resolve, reject) => {
+    ttl = ttl - 1;
+    if (ttl <= 0) {
+      reject(new Error(`Exceeded maximum retries after ${MAX_RETRIES - ttl} attempts`));
+      return;
+    }
+
+    axios
+      .get(url, {
+        validateStatus: (status) => status >= 200 && status < 500,
+      })
+      .then(({ status, data }) => {
+        if (status < 300 && data && data.components) {
+          resolve(data);
+          return;
+        }
+        if (!required) {
+          reject(new Error(`Not found, status was: ${status}`));
+          return;
+        }
+        console.log(`[Attempt ${MAX_RETRIES - ttl}] Retrying! Status was ${status}: ${url}`);
+        setTimeout(() => {
+          openUrl(url, required, ttl).then((data) => {
+            resolve(data);
+          });
+        }, WAIT_FOR);
+        return;
+      })
+      .catch((e) => {
+        reject(e);
+        return;
+      });
+  });
+};
+
 const generateApi = async (
   generatorAlias,
-  { openapiUrl, serviceName, serviceNamePascalCase, outputDirectory },
+  { openapiUrl, serviceName, serviceNamePascalCase, outputDirectory, required },
 ) => {
   const { generator, properties } = frameworks[generatorAlias];
 
   try {
-    await axios.get(openapiUrl);
+    await openUrl(openapiUrl, required);
   } catch (e) {
-    console.log(`Skipping ${serviceNamePascalCase} using ${openapiUrl}: ${e.message}`);
+    console.log(`Skipping ${serviceName} using ${openapiUrl}: ${e.message}`);
     return null;
   }
 
@@ -205,7 +245,7 @@ const generateApi = async (
 
   try {
     await exec(commands.join(' '));
-    console.log(`Generated library for ${serviceNamePascalCase} at ${outputDirectory}`);
+    console.log(`Generated library for ${serviceName} at ${outputDirectory}`);
   } catch (e) {
     console.log(`Error generating: `, e.message);
   }
@@ -213,7 +253,7 @@ const generateApi = async (
   return outputDirectory;
 };
 
-const run = async (generator, inputDirectory, outputDirectory) => {
+const run = async (generator, inputDirectory, outputDirectory, required) => {
   const { organization, repo } = await repoInfo();
   event(organization, repo, generator);
 
@@ -221,7 +261,7 @@ const run = async (generator, inputDirectory, outputDirectory) => {
     throw new Error(`Unknown generator: ${generator}`);
   }
 
-  const serviceMap = await fetchServiceMap(inputDirectory, outputDirectory);
+  const serviceMap = await fetchServiceMap(inputDirectory, outputDirectory, required);
 
   const promises = Object.values(serviceMap).map((properties) => {
     return async () => await generateApi(generator, properties);
@@ -239,13 +279,15 @@ const run = async (generator, inputDirectory, outputDirectory) => {
       .describe('i', `Input directory`)
       .default('i', '.scaffoldly')
       .describe('o', `Output directory`)
+      .describe('r', 'Require a response from these services(s)')
+      .array('r')
       .example(
         '$0 -g angular -o src/app/@openapi',
         'Generate Angular client libraries into src/app/@openapi/{service-name}',
       )
       .demandOption(['g', 'o']).argv;
 
-    await run(argv.g, argv.i, argv.o);
+    await run(argv.g, argv.i, argv.o, argv.r);
   } catch (e) {
     console.error(e);
   }
