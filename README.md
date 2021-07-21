@@ -36,6 +36,8 @@ Options:
   -g             Generator, one of: [angular,axios]                   [required]
   -i             Input directory                        [default: ".scaffoldly"]
   -o             Output directory                                     [required]
+  -f             Force generation (exclude version checks)
+                                                      [boolean] [default: false]
   -r             Require a response from these services(s), use '+all' to requir
                  e all services                                          [array]
 
@@ -49,6 +51,8 @@ Examples:
   index.js -g angular -o src/app/openapi    Generate Angular client libraries in
                                             to src/app/openapi/{service-name}. N
                                             o retries
+
+Missing required arguments: g, o
 ```
 
 ### Usage Tracking Opt-Out
