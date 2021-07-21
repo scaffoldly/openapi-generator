@@ -7,9 +7,11 @@ import { existsSync, realpathSync, readFileSync, openSync, mkdirSync } from 'fs'
 import { spawn } from 'child_process';
 import PQueue from 'p-queue';
 import yargs from 'yargs';
+import fs from 'fs';
 
 const MAX_RETRIES = 120;
 const WAIT_FOR = 5000; // milliseconds
+const VERSION_FILE = 'version.json';
 
 const { DNT } = process.env;
 
@@ -219,16 +221,72 @@ const openUrl = (url, required = false, ttl = MAX_RETRIES) => {
   });
 };
 
+const checkVersion = (serviceName, openApi, outputDirectory) => {
+  const ret = { match: false, old: undefined, new: undefined };
+  if (!openApi || !openApi.info || !openApi.info.version) {
+    console.log(`Unable to determine version for ${serviceName}: Missing metadata from OpenAPI`);
+    return ret;
+  }
+
+  const { info } = openApi;
+  const { version: openApiVersion } = info;
+
+  if (openApiVersion) {
+    ret.new = openApiVersion;
+  }
+
+  if (!fs.existsSync(outputDirectory)) {
+    console.log(`Unable to determine version for ${serviceName}: Output directory does not exist`);
+    return ret;
+  }
+
+  try {
+    const { version } = JSON.parse(
+      fs.readFileSync(`${fs.realpathSync(outputDirectory)}/${VERSION_FILE}`),
+    );
+
+    if (version) {
+      ret.old = version;
+    }
+  } catch (e) {
+    console.log(`Unable to determine version for ${serviceName}: Unable to read version file`);
+  }
+
+  if (ret.old && ret.new && ret.old === ret.new) {
+    ret.match = true;
+    return ret;
+  } else {
+    console.log(`Version mismatch for ${serviceName}. OpenAPI: ${ret.new}, Local: ${ret.old}`);
+  }
+
+  return ret;
+};
+
 const generateApi = async (
   generatorAlias,
   { openapiUrl, serviceName, serviceNamePascalCase, outputDirectory, required },
+  force = false,
 ) => {
   const { generator, properties } = frameworks[generatorAlias];
 
+  let version;
   try {
-    await openUrl(openapiUrl, required);
+    const openApi = await openUrl(openapiUrl, required);
+    const { match: versionMatch, new: newVersion } = checkVersion(
+      serviceName,
+      openApi,
+      outputDirectory,
+    );
+    if (versionMatch && !force) {
+      console.log(
+        `Skipping ${serviceName}: Version (${newVersion}) from OpenAPI and local matches (use -f to force regeneration)`,
+      );
+      return null;
+    } else {
+      version = newVersion;
+    }
   } catch (e) {
-    console.log(`Skipping ${serviceName} using ${openapiUrl}: ${e.message}`);
+    console.log(`Skipping ${serviceName} using ${openapiUrl}: ${e.message}`, e);
     return null;
   }
 
@@ -248,6 +306,13 @@ const generateApi = async (
   try {
     await exec(commands.join(' '));
     console.log(`Generated library for ${serviceName} at ${outputDirectory}`);
+
+    if (version) {
+      fs.writeFileSync(
+        `${fs.realpathSync(outputDirectory)}/${VERSION_FILE}`,
+        JSON.stringify({ version }),
+      );
+    }
   } catch (e) {
     console.log(`Error generating: `, e.message);
   }
@@ -255,7 +320,7 @@ const generateApi = async (
   return outputDirectory;
 };
 
-const run = async (generator, inputDirectory, outputDirectory, required) => {
+const run = async (generator, inputDirectory, outputDirectory, required, force) => {
   const { organization, repo } = await repoInfo();
   event(organization, repo, generator);
 
@@ -266,7 +331,7 @@ const run = async (generator, inputDirectory, outputDirectory, required) => {
   const serviceMap = await fetchServiceMap(inputDirectory, outputDirectory, required);
 
   const promises = Object.values(serviceMap).map((properties) => {
-    return async () => await generateApi(generator, properties);
+    return async () => await generateApi(generator, properties, force);
   });
 
   const queue = new PQueue({ concurrency: 1 });
@@ -281,6 +346,9 @@ const run = async (generator, inputDirectory, outputDirectory, required) => {
       .describe('i', `Input directory`)
       .default('i', '.scaffoldly')
       .describe('o', `Output directory`)
+      .describe('f', 'Force generation (exclude version checks)')
+      .boolean('f')
+      .default('f', false)
       .describe(
         'r',
         "Require a response from these services(s), use '+all' to require all services",
@@ -300,7 +368,7 @@ const run = async (generator, inputDirectory, outputDirectory, required) => {
       )
       .demandOption(['g', 'o']).argv;
 
-    await run(argv.g, argv.i, argv.o, argv.r);
+    await run(argv.g, argv.i, argv.o, argv.r, argv.f);
   } catch (e) {
     console.error(e);
   }
