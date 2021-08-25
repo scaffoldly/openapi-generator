@@ -321,8 +321,12 @@ const generateApi = async (
 };
 
 const run = async (generator, inputDirectory, outputDirectory, required, force) => {
-  const { organization, repo } = await repoInfo();
-  event(organization, repo, generator);
+  try {
+    const { organization, repo } = await repoInfo();
+    event(organization, repo, generator);
+  } catch (e) {
+    console.warn('Unable to get repo info', e.message);
+  }
 
   if (!Object.keys(frameworks).includes(generator)) {
     throw new Error(`Unknown generator: ${generator}`);
