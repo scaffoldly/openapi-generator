@@ -163,7 +163,7 @@ const fetchServiceMap = async (inputDirectory, outputDirectory, required = []) =
   const serviceMap = Object.entries(services).reduce((acc, [key, value]) => {
     const baseUrl = value.base_url || value['base-url'];
     const serviceName = value.service_name || value['service-name'];
-    if (envVars.SERVICE_NAME === serviceName) {
+    if (envVars.SERVICE_NAME === serviceName || envVars['service-name'] === serviceName) {
       console.log(`Skipping ${serviceName}, that's this project!`);
       return acc;
     }
