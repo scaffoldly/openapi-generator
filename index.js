@@ -162,7 +162,7 @@ const fetchServiceMap = async (inputDirectory, outputDirectory, required = []) =
 
   const serviceMap = Object.entries(services).reduce((acc, [key, value]) => {
     const { base_url: baseUrl, service_name: serviceName } = value;
-    if (envVars.SERVICE_NAME === serviceName) {
+    if (envVars.SERVICE_NAME === serviceName || env['service-name'] === serviceName) {
       console.log(`Skipping ${serviceName}, that's this project!`);
       return acc;
     }
@@ -256,7 +256,7 @@ const checkVersion = (serviceName, openApi, outputDirectory) => {
     ret.match = true;
     return ret;
   } else {
-    console.log(`Version mismatch for ${serviceName}. OpenAPI: ${ret.new}, Local: ${ret.old}`);
+    console.log(`Updating ${serviceName} from ${ret.old} to ${ret.new}`);
   }
 
   return ret;
