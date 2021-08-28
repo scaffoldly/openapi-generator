@@ -161,8 +161,9 @@ const fetchServiceMap = async (inputDirectory, outputDirectory, required = []) =
   const envVars = JSON.parse(readFileSync(openSync(envVarsFile)));
 
   const serviceMap = Object.entries(services).reduce((acc, [key, value]) => {
-    const { base_url: baseUrl, service_name: serviceName } = value;
-    if (envVars.SERVICE_NAME === serviceName || env['service-name'] === serviceName) {
+    const baseUrl = value.base_url || value['base-url'];
+    const serviceName = value.service_name || value['service-name'];
+    if (envVars.SERVICE_NAME === serviceName) {
       console.log(`Skipping ${serviceName}, that's this project!`);
       return acc;
     }
