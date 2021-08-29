@@ -12,6 +12,7 @@ import fs from 'fs';
 const MAX_RETRIES = 120;
 const WAIT_FOR = 5000; // milliseconds
 const VERSION_FILE = 'version.json';
+const VERSIONS_FILE = 'versions.json';
 
 const { DNT } = process.env;
 
@@ -270,7 +271,7 @@ const generateApi = async (
 ) => {
   const { generator, properties } = frameworks[generatorAlias];
 
-  let version;
+  let version = null;
   try {
     const openApi = await openUrl(openapiUrl, required);
     const { match: versionMatch, new: newVersion } = checkVersion(
@@ -282,13 +283,13 @@ const generateApi = async (
       console.log(
         `Skipping ${serviceName}: Version (${newVersion}) from OpenAPI and local matches (use -f to force regeneration)`,
       );
-      return null;
+      return { serviceName, version: newVersion };
     } else {
       version = newVersion;
     }
   } catch (e) {
     console.log(`Skipping ${serviceName} using ${openapiUrl}: ${e.message}`, e);
-    return null;
+    return { serviceName, version };
   }
 
   mkdirSync(outputDirectory, { recursive: true });
@@ -318,7 +319,7 @@ const generateApi = async (
     console.log(`Error generating: `, e.message);
   }
 
-  return outputDirectory;
+  return { serviceName, version };
 };
 
 const run = async (generator, inputDirectory, outputDirectory, required, force) => {
@@ -340,7 +341,12 @@ const run = async (generator, inputDirectory, outputDirectory, required, force) 
   });
 
   const queue = new PQueue({ concurrency: 1 });
-  await queue.addAll(promises);
+  const versions = await queue.addAll(promises);
+
+  fs.writeFileSync(
+    `${fs.realpathSync(outputDirectory)}/${VERSIONS_FILE}`,
+    JSON.stringify({ versions }),
+  );
 };
 
 (async () => {
