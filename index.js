@@ -343,6 +343,7 @@ const run = async (generator, inputDirectory, outputDirectory, required, force) 
   const queue = new PQueue({ concurrency: 1 });
   const versions = await queue.addAll(promises);
 
+  mkdirSync(outputDirectory, { recursive: true });
   fs.writeFileSync(
     `${fs.realpathSync(outputDirectory)}/${VERSIONS_FILE}`,
     JSON.stringify({ versions }),
