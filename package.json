@@ -1,6 +1,6 @@
 {
   "name": "@scaffoldly/openapi-generator",
-  "version": "1.0.21-0",
+  "version": "1.0.21",
   "description": "Wrapper for OpenAPITools/openapi-generator-cli",
   "main": "index.js",
   "type": "module",
