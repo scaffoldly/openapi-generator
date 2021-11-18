@@ -4,7 +4,7 @@
   "description": "Wrapper for OpenAPITools/openapi-generator-cli",
   "main": "index.js",
   "bin": {
-    "openapi-generator": "dist/index.js"
+    "openapi-generator": "index.js"
   },
   "scripts": {
     "build": "tsc",
