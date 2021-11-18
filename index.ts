@@ -7,7 +7,7 @@ import { existsSync, realpathSync, readFileSync, mkdirSync, writeFileSync } from
 import { spawn } from 'child_process';
 import yargs from 'yargs';
 import { dump } from 'js-yaml';
-import PQueue from 'p-queue/dist';
+import PQueue from 'p-queue';
 
 const MAX_RETRIES = 120;
 const WAIT_FOR = 5000; // milliseconds

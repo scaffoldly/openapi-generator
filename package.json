@@ -2,9 +2,9 @@
   "name": "@scaffoldly/openapi-generator",
   "version": "1.0.22-0",
   "description": "Wrapper for OpenAPITools/openapi-generator-cli",
-  "main": "index.js",
+  "main": "dist/index.js",
   "bin": {
-    "openapi-generator": "index.js"
+    "openapi-generator": "dist/index.js"
   },
   "scripts": {
     "build": "tsc",
@@ -20,7 +20,7 @@
   "dependencies": {
     "axios": "^0.21.1",
     "js-yaml": "^4.1.0",
-    "p-queue": "^7.1.0",
+    "p-queue": "6.6.2",
     "simple-git": "^2.39.0",
     "uri-js": "^4.4.1",
     "yargs": "^17.2.1"
