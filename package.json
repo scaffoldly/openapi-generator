@@ -3,12 +3,16 @@
   "version": "1.0.21",
   "description": "Wrapper for OpenAPITools/openapi-generator-cli",
   "main": "index.js",
-  "type": "module",
   "bin": {
-    "openapi-generator": "./index.js"
+    "openapi-generator": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "prepare": "yarn build",
+    "lint": "eslint 'src/**/*.{js,ts,tsx}' --quiet --fix && yarn run prettier --write 'src/**/*.{js,ts,tsx}'"
   },
   "files": [
-    "index.js"
+    "dist/index.js"
   ],
   "repository": "git@github.com:scaffoldly/openapi-generator",
   "author": "Christian Nuss",
@@ -19,10 +23,26 @@
     "p-queue": "^7.1.0",
     "simple-git": "^2.39.0",
     "uri-js": "^4.4.1",
-    "yargs": "^17.0.1"
+    "yargs": "^17.2.1"
   },
   "devDependencies": {
-    "@vercel/ncc": "^0.27.0"
+    "@babel/core": "^7.16.0",
+    "@babel/eslint-parser": "^7.16.0",
+    "@types/dns-packet": "^5.2.2",
+    "@types/p-queue": "^3.2.1",
+    "@types/yargs": "^17.0.7",
+    "@typescript-eslint/eslint-plugin": "^4.29.3",
+    "@typescript-eslint/parser": "^4.29.3",
+    "@vercel/ncc": "^0.27.0",
+    "eslint": "^7.2.0",
+    "eslint-config-airbnb": "18.2.1",
+    "eslint-config-airbnb-typescript": "14.0.2",
+    "eslint-config-prettier": "^8.3.0",
+    "eslint-plugin-import": "^2.22.1",
+    "eslint-plugin-jsx-a11y": "^6.4.1",
+    "eslint-plugin-prettier": "^4.0.0",
+    "prettier": "^2.4.1",
+    "typescript": "^4.4.4"
   },
   "keywords": [
     "cli",

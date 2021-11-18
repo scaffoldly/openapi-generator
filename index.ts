@@ -1,14 +1,13 @@
 #!/usr/bin/env node
 
 import simpleGit from 'simple-git';
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
 import { parse } from 'uri-js';
-import { existsSync, realpathSync, readFileSync, openSync, mkdirSync } from 'fs';
+import { existsSync, realpathSync, readFileSync, mkdirSync, writeFileSync } from 'fs';
 import { spawn } from 'child_process';
-import PQueue from 'p-queue';
 import yargs from 'yargs';
-import fs from 'fs';
-import yaml from 'js-yaml';
+import { dump } from 'js-yaml';
+import PQueue from 'p-queue/dist';
 
 const MAX_RETRIES = 120;
 const WAIT_FOR = 5000; // milliseconds
@@ -17,7 +16,10 @@ const VERSIONS_FILE = '.openapis';
 
 const { DNT } = process.env;
 
-const frameworks = {
+type FrameworkAliases = 'angular' | 'axios';
+type FrameworkMap = { [key in FrameworkAliases]: { generator: string; properties: string[] } };
+
+const frameworks: FrameworkMap = {
   angular: {
     generator: 'typescript-angular',
     properties: ['-p apiModulePrefix={serviceNamePascalCase}'],
@@ -28,9 +30,9 @@ const frameworks = {
   },
 };
 
-const pascalCase = (str) => {
+const pascalCase = (str: string) => {
   return str
-    .replace(/(\w)(\w*)/g, (g0, g1, g2) => {
+    .replace(/(\w)(\w*)/g, (_g0: string, g1: string, g2: string) => {
       return g1.toUpperCase() + g2.toLowerCase();
     })
     .replace(/[_-]/g, '');
@@ -38,6 +40,9 @@ const pascalCase = (str) => {
 
 const repoInfo = async () => {
   const log = await simpleGit().log({ maxCount: 1 });
+  if (!log.latest) {
+    throw new Error('Unable to fetch git log');
+  }
   const sha = log.latest.hash;
 
   const remotes = await simpleGit().getRemotes(true);
@@ -70,14 +75,10 @@ const repoInfo = async () => {
   return info;
 };
 
-const exec = (command) => {
+const exec = (command: string) => {
   return new Promise((resolve, reject) => {
     let stdout = '';
     let stderr = '';
-
-    const env = {
-      ...process.env,
-    };
 
     console.log(`Running Command: ${command}`);
 
@@ -93,7 +94,7 @@ const exec = (command) => {
       reject(err);
     });
 
-    p.on('exit', (code, signal) => {
+    p.on('exit', (code) => {
       if (code === 0) {
         resolve({
           stdout,
@@ -116,12 +117,12 @@ const exec = (command) => {
   });
 };
 
-const event = (org, repo, action, dnt = false) => {
+const event = (org: string, repo: string, action: string) => {
   if (DNT) {
     return;
   }
 
-  axios.default
+  axios
     .post(
       `https://api.segment.io/v1/track`,
       {
@@ -133,12 +134,24 @@ const event = (org, repo, action, dnt = false) => {
       { auth: { username: 'RvjEAi2NrzWFz3SL0bNwh5yVwrwWr0GA', password: '' } },
     )
     .then(() => {})
-    .catch((error) => {
+    .catch((error: AxiosError) => {
       console.error('Event Log Error', error);
     });
 };
 
-const fetchServiceMap = async (inputDirectory, outputDirectory, required = []) => {
+type Service = {
+  openapiUrl: string;
+  serviceName: string;
+  serviceNamePascalCase: string;
+  outputDirectory: string;
+  required: boolean;
+};
+
+const fetchServiceMap = async (
+  inputDirectory: string,
+  outputDirectory: string,
+  required: string[] = [],
+) => {
   if (!existsSync(inputDirectory)) {
     throw new Error(`Missing directory: ${inputDirectory}`);
   }
@@ -159,12 +172,14 @@ const fetchServiceMap = async (inputDirectory, outputDirectory, required = []) =
   console.log(`Using services.json: ${servicesFile}`);
   console.log(`Using env-vars.json: ${envVarsFile}`);
 
-  const services = JSON.parse(readFileSync(openSync(servicesFile)));
-  const envVars = JSON.parse(readFileSync(openSync(envVarsFile)));
+  const services = JSON.parse(readFileSync(servicesFile).toString());
+  const envVars = JSON.parse(readFileSync(envVarsFile).toString());
 
   const serviceMap = Object.entries(services).reduce((acc, [key, value]) => {
-    const baseUrl = value.base_url || value['base-url'];
-    const serviceName = value.service_name || value['service-name'];
+    const key$ = key as string;
+    const value$ = value as Record<string, string>;
+    const baseUrl = value$.base_url || value$['base-url'];
+    const serviceName = value$.service_name || value$['service-name'];
     if (envVars.SERVICE_NAME === serviceName || envVars['service-name'] === serviceName) {
       console.log(`Skipping ${serviceName}, that's this project!`);
       return acc;
@@ -173,7 +188,7 @@ const fetchServiceMap = async (inputDirectory, outputDirectory, required = []) =
     const serviceNamePascalCase = pascalCase(serviceName);
     const outDir = `${outputDirectory}/${serviceName}`;
     console.log(`Discovered ${serviceName} service (${openapiUrl})`);
-    acc[key] = {
+    acc[key$] = {
       openapiUrl,
       serviceName,
       serviceNamePascalCase,
@@ -183,12 +198,12 @@ const fetchServiceMap = async (inputDirectory, outputDirectory, required = []) =
         : false,
     };
     return acc;
-  }, {});
+  }, {} as { [key: string]: Service });
 
   return serviceMap;
 };
 
-const openUrl = (url, required = false, ttl = MAX_RETRIES) => {
+const openUrl = (url: string, required = false, ttl = MAX_RETRIES) => {
   return new Promise((resolve, reject) => {
     ttl = ttl - 1;
     if (ttl <= 0) {
@@ -211,8 +226,8 @@ const openUrl = (url, required = false, ttl = MAX_RETRIES) => {
         }
         console.log(`[Attempt ${MAX_RETRIES - ttl}] Retrying! Status was ${status}: ${url}`);
         setTimeout(() => {
-          openUrl(url, required, ttl).then((data) => {
-            resolve(data);
+          openUrl(url, required, ttl).then((data2) => {
+            resolve(data2);
           });
         }, WAIT_FOR);
         return;
@@ -224,8 +239,24 @@ const openUrl = (url, required = false, ttl = MAX_RETRIES) => {
   });
 };
 
-const checkVersion = (serviceName, openApi, outputDirectory) => {
-  const ret = { match: false, old: undefined, new: undefined };
+type OpenApiDoc = {
+  info?: {
+    version?: string;
+  };
+};
+
+type OpenApiVersion = {
+  match: boolean;
+  old?: string;
+  new?: string;
+};
+
+const checkVersion = (
+  serviceName: string,
+  openApi: OpenApiDoc,
+  outputDirectory: string,
+): OpenApiVersion => {
+  const ret: OpenApiVersion = { match: false };
   if (!openApi || !openApi.info || !openApi.info.version) {
     console.log(`Unable to determine version for ${serviceName}: Missing metadata from OpenAPI`);
     return ret;
@@ -238,14 +269,14 @@ const checkVersion = (serviceName, openApi, outputDirectory) => {
     ret.new = openApiVersion;
   }
 
-  if (!fs.existsSync(outputDirectory)) {
+  if (!existsSync(outputDirectory)) {
     console.log(`Unable to determine version for ${serviceName}: Output directory does not exist`);
     return ret;
   }
 
   try {
     const { version } = JSON.parse(
-      fs.readFileSync(`${fs.realpathSync(outputDirectory)}/${VERSION_FILE}`),
+      readFileSync(`${realpathSync(outputDirectory)}/${VERSION_FILE}`).toString(),
     );
 
     if (version) {
@@ -265,69 +296,71 @@ const checkVersion = (serviceName, openApi, outputDirectory) => {
   return ret;
 };
 
-const generateApi = async (
-  generatorAlias,
-  { openapiUrl, serviceName, serviceNamePascalCase, outputDirectory, required },
-  force = false,
-) => {
+const generateApi = async (generatorAlias: FrameworkAliases, service: Service, force = false) => {
   const { generator, properties } = frameworks[generatorAlias];
 
   let version = null;
   try {
-    const openApi = await openUrl(openapiUrl, required);
+    const openApi = (await openUrl(service.openapiUrl, service.required)) as OpenApiDoc;
     const { match: versionMatch, new: newVersion } = checkVersion(
-      serviceName,
+      service.serviceName,
       openApi,
-      outputDirectory,
+      service.outputDirectory,
     );
     if (versionMatch && !force) {
       console.log(
-        `Skipping ${serviceName}: Version (${newVersion}) from OpenAPI and local matches (use -f to force regeneration)`,
+        `Skipping ${service.serviceName}: Version (${newVersion}) from OpenAPI and local matches (use -f to force regeneration)`,
       );
-      return { serviceName, version: newVersion };
+      return { serviceName: service.serviceName, version: newVersion };
     } else {
       version = newVersion;
     }
-  } catch (e) {
-    console.log(`Skipping ${serviceName} using ${openapiUrl}: ${e.message}`, e);
-    return { serviceName, version };
+  } catch (e: any) {
+    console.log(`Skipping ${service.serviceName} using ${service.openapiUrl}: ${e.message}`, e);
+    return { serviceName: service.serviceName, version };
   }
 
-  mkdirSync(outputDirectory, { recursive: true });
+  mkdirSync(service.outputDirectory, { recursive: true });
 
-  let commands = [`npx @openapitools/openapi-generator-cli`];
+  const commands = [`npx @openapitools/openapi-generator-cli`];
   commands.push('generate');
   commands.push(`-g ${generator}`);
-  commands.push(`-i ${openapiUrl}`);
-  commands.push(`-o ${outputDirectory}`);
+  commands.push(`-i ${service.openapiUrl}`);
+  commands.push(`-o ${service.outputDirectory}`);
   commands.push(
-    properties.map((p) => {
-      return p.replace(`{serviceNamePascalCase}`, serviceNamePascalCase);
+    ...properties.map((p) => {
+      return p.replace(`{serviceNamePascalCase}`, service.serviceNamePascalCase);
     }),
   );
 
   try {
     await exec(commands.join(' '));
-    console.log(`Generated library for ${serviceName} at ${outputDirectory}`);
+    console.log(`Generated library for ${service.serviceName} at ${service.outputDirectory}`);
 
     if (version) {
-      fs.writeFileSync(
-        `${fs.realpathSync(outputDirectory)}/${VERSION_FILE}`,
+      writeFileSync(
+        `${realpathSync(service.outputDirectory)}/${VERSION_FILE}`,
         JSON.stringify({ version }),
       );
     }
   } catch (e) {
-    console.log(`Error generating: `, e.message);
+    console.log(`Error generating: `, e);
   }
 
-  return { serviceName, version };
+  return { serviceName: service.serviceName, version };
 };
 
-const run = async (generator, inputDirectory, outputDirectory, required, force) => {
+const run = async (
+  generator: FrameworkAliases,
+  inputDirectory: string,
+  outputDirectory: string,
+  required: string[],
+  force: boolean,
+) => {
   try {
     const { organization, repo } = await repoInfo();
     event(organization, repo, generator);
-  } catch (e) {
+  } catch (e: any) {
     console.warn('Unable to get repo info', e.message);
   }
 
@@ -338,15 +371,15 @@ const run = async (generator, inputDirectory, outputDirectory, required, force) 
   const serviceMap = await fetchServiceMap(inputDirectory, outputDirectory, required);
 
   const promises = Object.values(serviceMap).map((properties) => {
-    return async () => await generateApi(generator, properties, force);
+    return async () => generateApi(generator, properties, force);
   });
 
   const queue = new PQueue({ concurrency: 1 });
   const versions = await queue.addAll(promises);
 
   mkdirSync(outputDirectory, { recursive: true });
-  const yamlStr = yaml.dump(versions);
-  fs.writeFileSync(
+  const yamlStr = dump(versions);
+  writeFileSync(
     `./${VERSIONS_FILE}`,
     `
 # Do not edit this file, it is managed by @scaffoldly/openapi-generator
@@ -362,9 +395,10 @@ ${yamlStr}
 
 (async () => {
   try {
-    const argv = yargs(process.argv.slice(2))
+    const argv = await yargs(process.argv.slice(2))
       .usage('Usage: $0 [options]')
       .describe('g', `Generator, one of: [${Object.keys(frameworks)}]`)
+      .default('g', 'axios')
       .describe('i', `Input directory`)
       .default('i', '.scaffoldly')
       .describe('o', `Output directory`)
@@ -390,7 +424,7 @@ ${yamlStr}
       )
       .demandOption(['g', 'o']).argv;
 
-    await run(argv.g, argv.i, argv.o, argv.r, argv.f);
+    await run(argv.g as FrameworkAliases, argv.i, argv.o as string, argv.r as string[], argv.f);
   } catch (e) {
     console.error(e);
   }
