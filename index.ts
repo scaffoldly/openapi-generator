@@ -159,8 +159,8 @@ const fetchServiceMap = async (
 
   let inDir = realpathSync(inputDirectory);
 
-  if (inDir.indexOf('$NODE_ENV') !== -1) {
-    inDir = inDir.replace('$NODE_ENV', process.env.NODE_ENV || '');
+  if (inDir.indexOf('/$NODE_ENV') !== -1) {
+    inDir = inDir.replace('/$NODE_ENV', `${path.sep}${process.env.NODE_ENV} || ''`);
   }
 
   const servicesFile = path.join(inDir, 'services.json');
