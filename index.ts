@@ -164,7 +164,7 @@ const fetchServiceMap = async (
     throw new Error(`Missing directory: ${inputDirectory}`);
   }
 
-  let inDir = realpathSync(inputDirectory);
+  const inDir = realpathSync(inputDirectory);
 
   const servicesFile = path.join(inDir, 'services.json');
   const envVarsFile = path.join(inDir, 'env-vars.json');
