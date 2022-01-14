@@ -153,15 +153,18 @@ const fetchServiceMap = async (
   outputDirectory: string,
   required: string[] = [],
 ) => {
+  if (inputDirectory.indexOf('/$NODE_ENV') !== -1) {
+    inputDirectory = inputDirectory.replace(
+      '/$NODE_ENV',
+      `${path.sep}${process.env.NODE_ENV} || ''`,
+    );
+  }
+
   if (!existsSync(inputDirectory)) {
     throw new Error(`Missing directory: ${inputDirectory}`);
   }
 
   let inDir = realpathSync(inputDirectory);
-
-  if (inDir.indexOf('/$NODE_ENV') !== -1) {
-    inDir = inDir.replace('/$NODE_ENV', `${path.sep}${process.env.NODE_ENV} || ''`);
-  }
 
   const servicesFile = path.join(inDir, 'services.json');
   const envVarsFile = path.join(inDir, 'env-vars.json');
