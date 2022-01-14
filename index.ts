@@ -156,7 +156,7 @@ const fetchServiceMap = async (
   if (inputDirectory.indexOf('/$NODE_ENV') !== -1) {
     inputDirectory = inputDirectory.replace(
       '/$NODE_ENV',
-      `${path.sep}${process.env.NODE_ENV} || ''`,
+      `${path.sep}${process.env.NODE_ENV || ''}`,
     );
   }
 
