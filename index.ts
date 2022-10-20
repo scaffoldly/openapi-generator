@@ -8,7 +8,9 @@ import { spawn } from 'child_process';
 import yargs from 'yargs';
 import { dump } from 'js-yaml';
 import PQueue from 'p-queue';
-import path from 'path';
+import { join, sep } from 'path';
+import { tmpdir } from 'os';
+import { moveSync } from 'fs-extra';
 
 const MAX_RETRIES = 120;
 const WAIT_FOR = 5000; // milliseconds
@@ -17,8 +19,11 @@ const VERSIONS_FILE = '.openapis';
 
 const { DNT } = process.env;
 
-type FrameworkAliases = 'angular' | 'axios';
-type FrameworkMap = { [key in FrameworkAliases]: { generator: string; properties: string[] } };
+type CompileOpts = { prepareCommand?: string; command: string; compiledDirectory: string };
+type FrameworkAliases = 'angular' | 'axios' | 'axios-js';
+type FrameworkMap = {
+  [key in FrameworkAliases]: { generator: string; properties: string[]; compile?: CompileOpts };
+};
 
 const frameworks: FrameworkMap = {
   angular: {
@@ -28,6 +33,15 @@ const frameworks: FrameworkMap = {
   axios: {
     generator: 'typescript-axios',
     properties: ['-p modelNamePrefix={serviceNamePascalCase}'],
+  },
+  'axios-js': {
+    generator: 'typescript-axios',
+    properties: ['-p modelNamePrefix={serviceNamePascalCase} -p npmName=api'],
+    compile: {
+      prepareCommand: 'npm install',
+      command: 'npm run build',
+      compiledDirectory: 'dist',
+    },
   },
 };
 
@@ -76,7 +90,7 @@ const repoInfo = async () => {
   return info;
 };
 
-const exec = (command: string) => {
+const exec = (command: string, cwd?: string) => {
   return new Promise((resolve, reject) => {
     let stdout = '';
     let stderr = '';
@@ -86,6 +100,7 @@ const exec = (command: string) => {
     const parts = command.split(' ');
     const p = spawn(parts[0], parts.slice(1), {
       shell: true,
+      cwd,
       env: {
         ...process.env,
       },
@@ -154,10 +169,7 @@ const fetchServiceMap = async (
   required: string[] = [],
 ) => {
   if (inputDirectory.indexOf('/$NODE_ENV') !== -1) {
-    inputDirectory = inputDirectory.replace(
-      '/$NODE_ENV',
-      `${path.sep}${process.env.NODE_ENV || ''}`,
-    );
+    inputDirectory = inputDirectory.replace('/$NODE_ENV', `${sep}${process.env.NODE_ENV || ''}`);
   }
 
   if (!existsSync(inputDirectory)) {
@@ -166,8 +178,8 @@ const fetchServiceMap = async (
 
   const inDir = realpathSync(inputDirectory);
 
-  const servicesFile = path.join(inDir, 'services.json');
-  const envVarsFile = path.join(inDir, 'env-vars.json');
+  const servicesFile = join(inDir, 'services.json');
+  const envVarsFile = join(inDir, 'env-vars.json');
 
   if (!existsSync(servicesFile)) {
     throw new Error(`Missing file: ${servicesFile}`);
@@ -194,7 +206,7 @@ const fetchServiceMap = async (
     }
     const openapiUrl = `${baseUrl}/openapi.json`;
     const serviceNamePascalCase = pascalCase(serviceName);
-    const outDir = path.join(outputDirectory, serviceName);
+    const outDir = join(outputDirectory, serviceName);
     console.log(`Discovered ${serviceName} service (${openapiUrl})`);
     acc[key$] = {
       openapiUrl,
@@ -284,7 +296,7 @@ const checkVersion = (
 
   try {
     const { version } = JSON.parse(
-      readFileSync(path.join(realpathSync(outputDirectory), VERSION_FILE)).toString(),
+      readFileSync(join(realpathSync(outputDirectory), VERSION_FILE)).toString(),
     );
 
     if (version) {
@@ -305,7 +317,7 @@ const checkVersion = (
 };
 
 const generateApi = async (generatorAlias: FrameworkAliases, service: Service, force = false) => {
-  const { generator, properties } = frameworks[generatorAlias];
+  const { generator, properties, compile } = frameworks[generatorAlias];
 
   let version = null;
   try {
@@ -334,7 +346,14 @@ const generateApi = async (generatorAlias: FrameworkAliases, service: Service, f
   commands.push('generate');
   commands.push(`-g ${generator}`);
   commands.push(`-i ${service.openapiUrl}`);
-  commands.push(`-o ${service.outputDirectory}`);
+
+  const tempDir = join(tmpdir(), service.serviceNamePascalCase);
+  let outDir = service.outputDirectory;
+  if (compile) {
+    outDir = tempDir;
+  }
+  commands.push(`-o ${outDir}`);
+
   commands.push(
     ...properties.map((p) => {
       return p.replace(`{serviceNamePascalCase}`, service.serviceNamePascalCase);
@@ -343,11 +362,21 @@ const generateApi = async (generatorAlias: FrameworkAliases, service: Service, f
 
   try {
     await exec(commands.join(' '));
-    console.log(`Generated library for ${service.serviceName} at ${service.outputDirectory}`);
+    console.log(`Generated library for ${service.serviceName} at ${outDir}`);
+
+    if (compile) {
+      if (compile.prepareCommand) {
+        await exec(compile.prepareCommand, outDir);
+      }
+      await exec(compile.command, outDir);
+      const compileDir = join(outDir, compile.compiledDirectory);
+      moveSync(compileDir, service.outputDirectory, { overwrite: true });
+      console.log(`Compiled library for ${service.serviceName} to ${service.outputDirectory}`);
+    }
 
     if (version) {
       writeFileSync(
-        path.join(realpathSync(service.outputDirectory), VERSION_FILE),
+        join(realpathSync(service.outputDirectory), VERSION_FILE),
         JSON.stringify({ version }),
       );
     }
