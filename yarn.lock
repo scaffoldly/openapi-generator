@@ -379,9 +379,9 @@
   integrity sha512-yOlFc+7UtL/89t2ZhjPvvB/DeAr3r+Dq58IgzsFkOAvVC6NMJXmCGjbptdXdR9qsX7pKcTL+s87FtYREi2dEEQ==
 
 "@types/dns-packet@^5.2.2":
-  version "5.2.3"
-  resolved "https://registry.yarnpkg.com/@types/dns-packet/-/dns-packet-5.2.3.tgz#7656998c5f399a7a276dcc15f92a2c18a0c1b4e8"
-  integrity sha512-xtxj/I4IrFTNE2P8vq5p812YtQ+/rJQfKWPegIM74aw4eE7tPDGL7lIpYxhSzG+SqWDN1sIoxPh1O5GC2WLcyw==
+  version "5.6.5"
+  resolved "https://registry.yarnpkg.com/@types/dns-packet/-/dns-packet-5.6.5.tgz#49fc29a40f5d30227ed028fa1ee82601d3745e15"
+  integrity sha512-qXOC7XLOEe43ehtWJCMnQXvgcIpv6rPmQ1jXT98Ad8A3TB1Ue50jsCbSSSyuazScEuZ/Q026vHbrOTVkmwA+7Q==
   dependencies:
     "@types/node" "*"
 
